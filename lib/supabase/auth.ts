@@ -6,19 +6,16 @@ export async function signUp(email: string, password: string, userData?: any) {
   }
 
   try {
-    const response = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: userData || {},
-      },
-    });
+    const { data, error } = await supabase.auth.signUp(
+      { email, password },
+      { data: userData || {} }
+    );
 
-    if (response.error) {
-      throw new Error(response.error.message || 'Sign up failed');
+    if (error) {
+      throw new Error(error.message || 'Sign up failed');
     }
 
-    return response.data;
+    return data;
   } catch (error: any) {
     throw new Error(error.message || 'Sign up failed');
   }
