@@ -1,4 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FEVA Business Hub - Mobile Data Selling Platform
+
+A complete full-stack mobile data selling and reseller management platform for Ghana.
+
+## Features
+
+### 🎯 Landing Page
+- Hero section with prominent CTAs
+- Network support showcase (MTN, Telecel, AirtelTigo)
+- Why Choose Us section with 4 key benefits
+- Reseller Opportunity section with compelling benefits
+- Pricing showcase table
+- User testimonials
+- Final call-to-action section
+
+### 🔐 Authentication System
+- User registration with validation
+- Login with email/password
+- Forgot password functionality
+- Password reset via email
+- Secure session management
+
+### 👤 User Dashboard
+- Overview Stats (wallet balance, transactions, activity)
+- Buy Data (network selection, bundle purchase)
+- Wallet Management (deposit/withdraw)
+- Transaction History (complete transaction log)
+- Profile Settings (personal info, password, phone)
+
+### 👨‍💼 Admin Panel
+- Dashboard (users, transactions, revenue)
+- User Management
+- Transaction Monitoring
+- Pricing Management
+- Broadcast Messaging
+
+## Getting Started
+
+### Prerequisites
+- Node.js 18+ and npm
+- Supabase account
+- DataMart API key
+
+### Installation
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Set up `.env.local`:
+```
+NEXT_PUBLIC_SUPABASE_URL=your-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-key
+DATA_API_KEY=your-api-key
+DATA_API_URL=https://api.datamartgh.shop
+NEXT_PUBLIC_WHATSAPP_NUMBER=0534436642
+```
+
+3. Run development server:
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+## Build for Production
+```bash
+npm run build
+npm run start
+```
+
+## Setup Guide
+
+See [SETUP_GUIDE.md](./SETUP_GUIDE.md) for detailed setup instructions.
+
+## Admin Access
+
+Create account with "admin" in email to access `/admin`
+
+## Support
+
+**WhatsApp**: 0534436642
+**Email**: support@fevadata.com
 
 ## Getting Started
 

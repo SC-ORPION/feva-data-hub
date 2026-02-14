@@ -1,0 +1,8 @@
+{
+  "[sql]": {
+    "editor.defaultFormatter": null
+  },
+  "mssql.intellisense.enableIntelliSense": false,
+  "mssql.linter.excludeSchemas": ["public"],
+  "sql.linter.run": "onSave"
+}
