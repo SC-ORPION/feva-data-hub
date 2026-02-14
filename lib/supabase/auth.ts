@@ -1,6 +1,10 @@
 import { supabase } from './client';
 
 export async function signUp(email: string, password: string, userData: any) {
+  if (!email || !password) {
+    throw new Error('Email and password are required');
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -9,7 +13,10 @@ export async function signUp(email: string, password: string, userData: any) {
     },
   });
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(error.message || 'Sign up failed');
+  }
+
   return data;
 }
 
