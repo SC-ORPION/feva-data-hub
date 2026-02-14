@@ -1,23 +1,27 @@
 import { supabase } from './client';
 
-export async function signUp(email: string, password: string, userData: any) {
+export async function signUp(email: string, password: string, userData?: any) {
   if (!email || !password) {
     throw new Error('Email and password are required');
   }
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: userData,
-    },
-  });
+  try {
+    const response = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: userData || {},
+      },
+    });
 
-  if (error) {
+    if (response.error) {
+      throw new Error(response.error.message || 'Sign up failed');
+    }
+
+    return response.data;
+  } catch (error: any) {
     throw new Error(error.message || 'Sign up failed');
   }
-
-  return data;
 }
 
 export async function signIn(email: string, password: string) {
@@ -25,24 +29,32 @@ export async function signIn(email: string, password: string) {
     throw new Error('Email and password are required');
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  try {
+    const response = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  if (error) {
-    if (error.message.includes('Invalid login credentials')) {
-      throw new Error('Invalid email or password');
+    if (response.error) {
+      if (response.error.message.includes('Invalid login credentials')) {
+        throw new Error('Invalid email or password');
+      }
+      throw new Error(response.error.message || 'Login failed');
     }
+
+    return response.data;
+  } catch (error: any) {
     throw new Error(error.message || 'Login failed');
   }
-
-  return data;
 }
 
 export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+  } catch (error: any) {
+    throw new Error(error.message || 'Sign out failed');
+  }
 }
 
 export async function resetPassword(email: string) {
