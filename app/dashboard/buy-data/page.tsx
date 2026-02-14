@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/lib/supabase/auth-context';
-import { AlertCircle, CheckCircle, Loader, CreditCard } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader, CreditCard, Landmark } from 'lucide-react';
 
 const networks = [
   { code: 'YELLO', name: 'MTN' },
@@ -24,6 +24,7 @@ export default function BuyDataPage() {
     network: '',
     dataSize: '',
   });
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'paystack'>('wallet');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: string; text: string; txRef?: string } | null>(null);
 
@@ -45,31 +46,60 @@ export default function BuyDataPage() {
         throw new Error('You must be logged in to purchase data');
       }
 
-      // Call API route to process purchase
-      const response = await fetch('/api/purchase', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          phoneNumber: formData.phoneNumber,
-          network: formData.network,
-          dataSize: parseInt(formData.dataSize),
-          userId: user.id,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setMessage({
-          type: 'success',
-          text: `Purchase successful! Data bundle will be delivered to ${formData.phoneNumber}`,
-          txRef: result.transactionReference,
+      if (paymentMethod === 'wallet') {
+        // Existing wallet payment flow
+        const response = await fetch('/api/purchase', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phoneNumber: formData.phoneNumber,
+            network: formData.network,
+            dataSize: parseInt(formData.dataSize),
+            userId: user.id,
+          }),
         });
-        setFormData({ phoneNumber: '', network: '', dataSize: '' });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          setMessage({
+            type: 'success',
+            text: `Purchase successful! Data bundle will be delivered to ${formData.phoneNumber}`,
+            txRef: result.transactionReference,
+          });
+          setFormData({ phoneNumber: '', network: '', dataSize: '' });
+        } else {
+          setMessage({ type: 'error', text: result.error || 'Purchase failed. Please try again.' });
+        }
       } else {
-        setMessage({ type: 'error', text: result.error || 'Purchase failed. Please try again.' });
+        // Paystack payment flow
+        const selectedBundle = bundles.find((b) => b.size === parseInt(formData.dataSize));
+        
+        const response = await fetch('/api/paystack/initialize', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: user.email,
+            amount: selectedBundle?.price,
+            userId: user.id,
+            phoneNumber: formData.phoneNumber,
+            network: formData.network,
+            dataSize: parseInt(formData.dataSize),
+          }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.authorizationUrl) {
+          // Redirect to Paystack payment page
+          window.location.href = result.authorizationUrl;
+        } else {
+          setMessage({ type: 'error', text: result.error || 'Failed to initiate payment. Please try again.' });
+        }
       }
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'An error occurred' });
@@ -220,6 +250,49 @@ export default function BuyDataPage() {
           </div>
         )}
 
+        {/* Payment Method Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 mb-3">Payment Method</label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className={`p-4 border-2 rounded-lg cursor-pointer transition flex items-center gap-3 ${
+              paymentMethod === 'wallet' 
+                ? 'border-blue-600 bg-blue-50' 
+                : 'border-gray-300 hover:border-blue-300'
+            }`}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="wallet"
+                checked={paymentMethod === 'wallet'}
+                onChange={(e) => setPaymentMethod(e.target.value as 'wallet' | 'paystack')}
+                className="w-4 h-4 text-blue-600"
+              />
+              <div>
+                <div className="font-semibold text-gray-900">Wallet</div>
+                <div className="text-xs text-gray-600">Use account balance</div>
+              </div>
+            </label>
+            <label className={`p-4 border-2 rounded-lg cursor-pointer transition flex items-center gap-3 ${
+              paymentMethod === 'paystack' 
+                ? 'border-blue-600 bg-blue-50' 
+                : 'border-gray-300 hover:border-blue-300'
+            }`}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="paystack"
+                checked={paymentMethod === 'paystack'}
+                onChange={(e) => setPaymentMethod(e.target.value as 'wallet' | 'paystack')}
+                className="w-4 h-4 text-blue-600"
+              />
+              <div>
+                <div className="font-semibold text-gray-900">Paystack</div>
+                <div className="text-xs text-gray-600">Card, Mobile money</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
         {/* Submit Button */}
         <button
           type="submit"
@@ -227,7 +300,7 @@ export default function BuyDataPage() {
           className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {loading && <Loader size={18} className="animate-spin" />}
-          {loading ? 'Processing Purchase...' : 'Proceed to Payment'}
+          {loading ? 'Processing...' : paymentMethod === 'wallet' ? 'Proceed with Wallet' : 'Proceed to Paystack'}
         </button>
 
         <p className="text-xs text-gray-500 text-center">
