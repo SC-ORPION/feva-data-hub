@@ -1,159 +1,134 @@
 'use client';
 
+import { Plus, Vote } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
-import { CreditCard, TrendingUp, Clock } from 'lucide-react';
+import { ButtonLink } from '@/components/ui/button';
+import { Notice } from '@/components/ui/notice';
+import { PageLoading } from '@/components/ui/spinner';
+import { PhasePill } from '@/components/ui/status';
+import { useAdmin } from '@/lib/admin-context';
+import { formatDate, formatDateTime, percent } from '@/lib/format';
+import { supabaseBrowser } from '@/lib/supabase/client';
+import { electionPhase } from '@/lib/voting/phase';
+import type { Election } from '@/lib/voting/types';
 
-export default function DashboardPage() {
-  const [walletBalance, setWalletBalance] = useState(0);
-  const [totalTransactions, setTotalTransactions] = useState(0);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+type Row = Election & { total: { count: number }[]; voted: { count: number }[] };
+
+function whenText(e: Election): string {
+  const phase = electionPhase(e);
+  if (phase === 'draft') return `Created ${formatDate(e.created_at)}`;
+  if (phase === 'scheduled') return `Opens ${formatDateTime(e.starts_at)}`;
+  if (phase === 'open') return e.ends_at ? `Closes ${formatDateTime(e.ends_at)}` : 'Open until you close it';
+  return `Closed ${formatDateTime(e.closed_at ?? e.ends_at)}`;
+}
+
+export default function ElectionsPage() {
+  const { org, isPlatformAdmin } = useAdmin();
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    if (!org) return;
+    supabaseBrowser()
+      .from('elections')
+      .select('*, total:voters(count), voted:voters(count)')
+      .eq('org_id', org.id)
+      .eq('voted.has_voted', true)
+      .order('created_at', { ascending: false })
+      .then(({ data, error: e }) => {
+        if (e) setError(true);
+        else setRows((data ?? []) as Row[]);
+      });
+  }, [org]);
 
-      if (user) {
-        // Fetch wallet balance
-        const { data: walletData } = await supabase
-          .from('wallets')
-          .select('balance')
-          .eq('user_id', user.id)
-          .single();
-
-        if (walletData) {
-          setWalletBalance(walletData.balance);
-        }
-
-        // Fetch transactions count
-        const { data: transactionsData, count } = await supabase
-          .from('transactions')
-          .select('*', { count: 'exact' })
-          .eq('user_id', user.id)
-          .limit(5)
-          .order('created_at', { ascending: false });
-
-        if (count) {
-          setTotalTransactions(count);
-        }
-
-        if (transactionsData) {
-          setRecentActivity(transactionsData);
-        }
-      }
-
-      setLoading(false);
-    };
-
-    fetchDashboardData();
-  }, []);
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  if (!org) return null;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Wallet Balance</p>
-              <p className="text-3xl font-bold text-gray-900">
-                GHS {walletBalance.toFixed(2)}
-              </p>
-            </div>
-            <CreditCard className="w-12 h-12 text-blue-600 opacity-20" />
-          </div>
+    <div className="grid gap-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Elections</h1>
+          <p className="mt-1 text-ink-2">Everything {org.name} is voting on.</p>
         </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Total Transactions</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {totalTransactions}
-              </p>
-            </div>
-            <TrendingUp className="w-12 h-12 text-green-600 opacity-20" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Recent Activity</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {recentActivity.length}
-              </p>
-            </div>
-            <Clock className="w-12 h-12 text-orange-600 opacity-20" />
-          </div>
-        </div>
+        <ButtonLink href="/dashboard/new">
+          <Plus className="size-4" aria-hidden="true" /> New election
+        </ButtonLink>
       </div>
 
-      {/* Recent Transactions */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Recent Transactions</h2>
+      {org.status === 'pending' && (
+        <Notice
+          tone="warn"
+          title="Waiting for approval"
+          action={
+            isPlatformAdmin ? (
+              <Link href="/dashboard/platform" className="font-semibold text-accent underline-offset-2 hover:underline">
+                You run this platform. Approve it now
+              </Link>
+            ) : undefined
+          }
+        >
+          You can set up elections now. You’ll be able to open voting once we confirm {org.name} is real. This
+          usually takes less than a day.
+        </Notice>
+      )}
+      {org.status === 'rejected' && (
+        <Notice tone="danger" title="We could not approve this organization">
+          Voting can’t be opened. If you think this is a mistake, reply to your sign-up email and we’ll look again.
+        </Notice>
+      )}
+
+      {error && <Notice tone="danger">We couldn’t load your elections. Refresh the page to try again.</Notice>}
+      {!rows && !error && <PageLoading label="Loading elections" />}
+
+      {rows && rows.length === 0 && (
+        <div className="rounded-lg border border-dashed border-line-strong px-6 py-14 text-center">
+          <Vote className="mx-auto size-10 text-ink-3" strokeWidth={1.5} aria-hidden="true" />
+          <h2 className="mt-4 text-lg font-bold">No elections yet</h2>
+          <p className="mx-auto mt-1 max-w-sm text-ink-2">
+            Set up the positions, candidates and voter list. Nothing goes live until you open voting.
+          </p>
+          <ButtonLink href="/dashboard/new" className="mt-6">
+            Set up your first election
+          </ButtonLink>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                  Amount
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentActivity.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="px-6 py-4 text-center text-gray-600">
-                    No transactions yet
-                  </td>
-                </tr>
-              ) : (
-                recentActivity.map((transaction) => (
-                  <tr key={transaction.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {new Date(transaction.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      GHS {transaction.amount}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          transaction.status === 'completed'
-                            ? 'bg-green-100 text-green-800'
-                            : transaction.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {transaction.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
+
+      {rows && rows.length > 0 && (
+        <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-card">
+          {rows.map((e) => {
+            const total = e.total[0]?.count ?? 0;
+            const voted = e.voted[0]?.count ?? 0;
+            const phase = electionPhase(e);
+            return (
+              <li key={e.id}>
+                <Link
+                  href={`/dashboard/elections/${e.id}`}
+                  className="grid gap-x-6 gap-y-1 px-5 py-4 transition-colors hover:bg-sunk sm:grid-cols-[1fr_auto_10rem] sm:items-center"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-bold">{e.title}</span>
+                    <span className="block text-sm text-ink-2">{whenText(e)}</span>
+                  </span>
+                  <span>
+                    <PhasePill phase={phase} />
+                  </span>
+                  <span className="text-sm text-ink-2 tabular sm:text-right">
+                    {phase === 'draft' ? (
+                      `${total.toLocaleString()} on the list`
+                    ) : (
+                      <>
+                        <span className="font-semibold text-ink">{voted.toLocaleString()}</span> of {total.toLocaleString()} voted
+                        <span className="text-ink-3"> · {percent(voted, total)}%</span>
+                      </>
+                    )}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

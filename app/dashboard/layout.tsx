@@ -1,121 +1,112 @@
 'use client';
 
+import { LogOut } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/supabase/auth-context';
-import {
-  LayoutDashboard,
-  ShoppingCart,
-  Wallet,
-  History,
-  User,
-  LogOut,
-  Menu,
-  X,
-} from 'lucide-react';
-import { useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { AuthShell } from '@/components/auth-shell';
+import { Button } from '@/components/ui/button';
+import { Field, Input } from '@/components/ui/field';
+import { Logo } from '@/components/ui/logo';
+import { Notice } from '@/components/ui/notice';
+import { PageLoading } from '@/components/ui/spinner';
+import { AdminProvider, useAdmin } from '@/lib/admin-context';
+import { supabaseBrowser } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/voting/errors';
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function OrgSetup() {
+  const { refreshOrg } = useAdmin();
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (name.trim().length < 2) return setError('Enter the name of your school, church or group.');
+    setBusy(true);
+    const { error: rpcError } = await supabaseBrowser().rpc('create_organization', { p_name: name.trim() });
+    if (rpcError) {
+      setBusy(false);
+      return setError(friendlyError(rpcError));
+    }
+    await refreshOrg();
+  }
+
+  return (
+    <AuthShell title="One more step" intro="What is the name of the school, church or group running elections?">
+      <form onSubmit={submit} className="grid gap-5">
+        <Field label="Organization name" htmlFor="org" hint="Voters will see this name.">
+          <Input id="org" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
+        </Field>
+        {error && <Notice tone="danger">{error}</Notice>}
+        <Button type="submit" size="lg" loading={busy}>
+          Continue
+        </Button>
+      </form>
+    </AuthShell>
+  );
+}
+
+function Shell({ children }: { children: ReactNode }) {
+  const { loading, session, org, isPlatformAdmin, signOut } = useAdmin();
   const router = useRouter();
-  const { user, loading, signOut } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!loading && !session) router.replace('/login');
+  }, [loading, session, router]);
 
-  if (!user) {
-    router.push('/auth/login');
-    return null;
-  }
+  if (loading || !session) return <PageLoading />;
+  if (!org) return <OrgSetup />;
 
-  const handleLogout = async () => {
-    await signOut();
-    router.push('/');
-  };
-
-  const sidebarItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/buy-data', label: 'Buy Data', icon: ShoppingCart },
-    { href: '/dashboard/wallet', label: 'Wallet', icon: Wallet },
-    { href: '/dashboard/transactions', label: 'Transactions', icon: History },
-    { href: '/dashboard/profile', label: 'Profile', icon: User },
+  const nav = [
+    { href: '/dashboard', label: 'Elections', active: pathname === '/dashboard' || pathname.startsWith('/dashboard/elections') || pathname === '/dashboard/new' },
+    { href: '/dashboard/settings', label: 'Settings', active: pathname === '/dashboard/settings' },
+    ...(isPlatformAdmin ? [{ href: '/dashboard/platform', label: 'Approvals', active: pathname === '/dashboard/platform' }] : []),
   ];
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <div
-        className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-gray-900 text-white transition-transform duration-200 ease-in-out transform ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
-      >
-        <div className="p-6 border-b border-gray-800">
-          <h1 className="text-2xl font-bold">FEVA</h1>
+    <div className="min-h-dvh">
+      <header className="border-b border-line bg-card print:hidden">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
+          <Logo href="/dashboard" />
+          <span className="hidden h-5 w-px bg-line sm:block" aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-2">{org.name}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={async () => {
+              await signOut();
+              router.replace('/login');
+            }}
+          >
+            <LogOut className="size-4" aria-hidden="true" /> Sign out
+          </Button>
         </div>
-        <nav className="mt-6">
-          {sidebarItems.map(({ href, label, icon: Icon }) => (
+        <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-2 sm:px-4" aria-label="Dashboard">
+          {nav.map((item) => (
             <Link
-              key={href}
-              href={href}
-              className="flex items-center gap-4 px-6 py-3 hover:bg-gray-800 transition"
-              onClick={() => setSidebarOpen(false)}
+              key={item.href}
+              href={item.href}
+              aria-current={item.active ? 'page' : undefined}
+              className={`border-b-2 px-3 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors ${
+                item.active ? 'border-accent text-ink' : 'border-transparent text-ink-2 hover:text-ink'
+              }`}
             >
-              <Icon size={20} />
-              <span>{label}</span>
+              {item.label}
             </Link>
           ))}
         </nav>
-        <div className="absolute bottom-6 left-0 right-0 px-6">
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-4 w-full px-6 py-3 bg-red-600 rounded-lg hover:bg-red-700 transition"
-          >
-            <LogOut size={20} />
-            <span>Logout</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 md:hidden z-40"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between md:justify-end">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="md:hidden"
-          >
-            {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-          <div className="flex items-center gap-4">
-            <span className="text-gray-700 text-sm md:text-base">{user?.email}</span>
-          </div>
-        </div>
-
-        {/* Page Content */}
-        <div className="flex-1 overflow-auto">
-          <div className="p-6">{children}</div>
-        </div>
-      </div>
+      </header>
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 print:max-w-none print:p-0">{children}</main>
     </div>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: ReactNode }) {
+  return (
+    <AdminProvider>
+      <Shell>{children}</Shell>
+    </AdminProvider>
   );
 }

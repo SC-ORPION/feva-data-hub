@@ -1,26 +1,212 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --paper: #f3f5f1;
+  --card: #ffffff;
+  --sunk: #eaeee8;
+  --ink: #13201a;
+  --ink-2: #46564e;
+  --ink-3: #62726a;
+  --line: #d9dfd9;
+  --line-strong: #b4bfb7;
+  --accent: #0b6b4b;
+  --accent-hover: #085a3f;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2f0e8;
+  --mark: #5b3e9e;
+  --mark-soft: #efe9fa;
+  --warn: #8a5300;
+  --warn-soft: #fbf0dc;
+  --danger: #b42318;
+  --danger-soft: #fcebe9;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #0e1412;
+    --card: #151d1a;
+    --sunk: #111816;
+    --ink: #e6ece8;
+    --ink-2: #aab7b0;
+    --ink-3: #8c9a92;
+    --line: #26312c;
+    --line-strong: #3b4842;
+    --accent: #3fb885;
+    --accent-hover: #5ccb9a;
+    --accent-ink: #05130d;
+    --accent-soft: #143027;
+    --mark: #b39cf0;
+    --mark-soft: #241c38;
+    --warn: #e8b35c;
+    --warn-soft: #2e2414;
+    --danger: #f0877c;
+    --danger-soft: #35191a;
+    color-scheme: dark;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-sunk: var(--sunk);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-mark: var(--mark);
+  --color-mark-soft: var(--mark-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-atkinson-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@theme {
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.6rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.65rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.85rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.15rem;
+  --text-3xl: 2.5rem;
+  --text-3xl--line-height: 2.85rem;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  accent-color: var(--accent);
+  caret-color: var(--accent);
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+/* Bars grow from the left with transform, so live updates never trigger layout. */
+.meter {
+  transform-origin: left center;
+  transition: transform 300ms var(--ease-out);
+}
+
+/* Each new step or ballot position eases in rather than snapping. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.rise-in {
+  animation: rise-in 220ms var(--ease-out) both;
+}
+
+dialog[open] {
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+dialog::backdrop {
+  transition: background-color 200ms ease;
+}
+
+@starting-style {
+  dialog[open]::backdrop {
+    background-color: transparent;
+  }
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes stamp-in {
+  0% {
+    opacity: 0;
+    transform: scale(1.6) rotate(-14deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-8deg);
+  }
+}
+
+.voted-stamp {
+  transform: rotate(-8deg);
+  animation: stamp-in 420ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
 }

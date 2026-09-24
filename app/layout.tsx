@@ -1,43 +1,27 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import Header from "@/components/common/Header";
-import Footer from "@/components/common/Footer";
-import WhatsAppButton from "@/components/common/WhatsAppButton";
-import { AuthProvider } from "@/lib/supabase/auth-context";
+import type { Metadata, Viewport } from 'next';
+import { Atkinson_Hyperlegible_Mono, Atkinson_Hyperlegible_Next } from 'next/font/google';
+import { APP_NAME } from '@/lib/config';
+import './globals.css';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const sans = Atkinson_Hyperlegible_Next({ subsets: ['latin'], variable: '--font-atkinson' });
+const mono = Atkinson_Hyperlegible_Mono({ subsets: ['latin'], variable: '--font-atkinson-mono' });
 
 export const metadata: Metadata = {
-  title: "FEVA Data Hub - Buy Cheap Data Instantly",
-  description: "Fast, reliable, and affordable mobile data bundles for all networks in Ghana",
+  title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
+  description: 'Run a fair, secret vote for your school, church or group. Voters use their phone. Results count themselves.',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f3f5f1' },
+    { media: '(prefers-color-scheme: dark)', color: '#0e1412' },
+  ],
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white`}
-      >
-        <AuthProvider>
-          <Header />
-          {children}
-          <Footer />
-          <WhatsAppButton />
-        </AuthProvider>
-      </body>
+    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+      <body className="min-h-dvh antialiased">{children}</body>
     </html>
   );
 }
