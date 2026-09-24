@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Installed agent skills (Impeccable, Emil Kowalski) ship their own bundled scripts.
+    ".claude/**",
   ]),
 ]);
 

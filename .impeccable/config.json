@@ -1,0 +1,18 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-color",
+        "value": "#000",
+        "createdAt": "2026-09-24T17:23:52.235Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#0e1412",
+        "createdAt": "2026-09-24T17:23:52.245Z"
+      }
+    ]
+  }
+}
