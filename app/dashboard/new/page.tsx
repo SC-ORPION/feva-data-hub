@@ -8,6 +8,7 @@ import { BallotEditor } from '@/components/admin/ballot-editor';
 import { VoterImport } from '@/components/admin/voter-import';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/field';
+import { Meter } from '@/components/ui/meter';
 import { Notice } from '@/components/ui/notice';
 import { useAdmin } from '@/lib/admin-context';
 import { ballotPayload, ballotProblem, newPosition, tidyBallot, type DraftPosition } from '@/lib/ballot-draft';
@@ -18,7 +19,7 @@ import { uniqueCodes } from '@/lib/voting/codes';
 import { friendlyError } from '@/lib/voting/errors';
 import type { ResultsVisibility, VoterMethod, VoterRow } from '@/lib/voting/types';
 
-const STEPS = ['About this vote', 'How voters sign in', 'Voter list', 'Positions and candidates', 'Timing and results', 'Check and create'];
+const STEPS = ['About this vote', 'How voters sign in', 'Voter list', 'Positions and candidates', 'Timing and rules', 'Check and create'];
 
 type Template = 'school' | 'church' | 'group' | 'other';
 const TEMPLATES: Record<Template, { label: string; example: string; positions: [string, number][] }> = {
@@ -70,6 +71,7 @@ export default function NewElectionPage() {
   const [endsAt, setEndsAt] = useState('');
   const [visibility, setVisibility] = useState<ResultsVisibility>('after_close');
   const [emailResults, setEmailResults] = useState(false);
+  const [majority, setMajority] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
 
@@ -87,6 +89,7 @@ export default function NewElectionPage() {
 
   function chooseTemplate(t: Template) {
     setTemplate(t);
+    setMajority(t === 'school');
     const untouched = positions.every((p) => p.candidates.every((c) => !c.name.trim()));
     if (untouched) setPositions(TEMPLATES[t].positions.map(([name, seats]) => newPosition(name, seats)));
   }
@@ -164,6 +167,7 @@ export default function NewElectionPage() {
           ends_at: timing === 'scheduled' ? fromLocalInput(endsAt) : null,
           results_visibility: visibility,
           email_results: canEmailResults && emailResults,
+          majority_rule: majority,
           positions: ballot,
         },
       });
@@ -206,9 +210,7 @@ export default function NewElectionPage() {
           <p className="text-sm text-ink-2">
             Step {step + 1} of {STEPS.length}: <span className="font-semibold text-ink">{STEPS[step]}</span>
           </p>
-          <div className="mt-2 h-1.5 rounded-full bg-sunk">
-            <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
-          </div>
+          <Meter value={step + 1} max={STEPS.length} className="mt-2 h-1.5" />
         </div>
 
         <ol className="mt-6 hidden gap-1 md:grid">
@@ -244,7 +246,7 @@ export default function NewElectionPage() {
           {STEPS[step]}
         </h2>
 
-        <div className="mt-6 grid gap-6">
+        <div key={step} className="rise-in mt-6 grid gap-6">
           {step === 0 && (
             <>
               <fieldset className="grid gap-2">
@@ -385,6 +387,19 @@ export default function NewElectionPage() {
                 )}
               </fieldset>
               <fieldset className="grid gap-3">
+                <legend className="mb-2 text-sm font-semibold">How does someone win?</legend>
+                <ChoiceCard name="rule" checked={!majority} onSelect={() => setMajority(false)}>
+                  <span className="font-semibold">Most votes wins</span>
+                  <span className="mt-0.5 block text-sm text-ink-2">Whoever gets the most votes wins, even with less than half.</span>
+                </ChoiceCard>
+                <ChoiceCard name="rule" checked={majority} onSelect={() => setMajority(true)}>
+                  <span className="font-semibold">More than half the votes (50% + 1)</span>
+                  <span className="mt-0.5 block text-sm text-ink-2">
+                    If nobody gets more than half, you can start a run-off between the top two in one click, with the same voters.
+                  </span>
+                </ChoiceCard>
+              </fieldset>
+              <fieldset className="grid gap-3">
                 <legend className="mb-2 text-sm font-semibold">When can voters see results?</legend>
                 <ChoiceCard name="visibility" checked={visibility === 'live'} onSelect={() => setVisibility('live')}>
                   <span className="font-semibold">Live, while people vote</span>
@@ -446,13 +461,14 @@ export default function NewElectionPage() {
                 },
                 {
                   at: 4,
-                  label: 'Timing and results',
+                  label: 'Timing and rules',
                   value: (
                     <>
                       {timing === 'manual'
                         ? 'You open and close voting'
                         : `${startsAt ? `Opens ${formatDateTime(fromLocalInput(startsAt))}, closes` : 'Closes'} ${formatDateTime(fromLocalInput(endsAt))}`}
                       <span className="block text-sm text-ink-2">
+                        {majority ? 'Winners need more than half the votes. ' : 'Most votes wins. '}
                         {visibility === 'live' ? 'Results show live' : 'Results show after voting closes'}
                         {canEmailResults && emailResults ? ' and are emailed to voters' : ''}
                       </span>

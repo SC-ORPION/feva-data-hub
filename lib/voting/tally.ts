@@ -8,18 +8,34 @@ export interface PositionOutcome {
   unopposed: boolean;
   skipped: number;
   totalChoices: number;
+  /** Set when the 50% + 1 rule applies and nobody reached it: who goes to the run-off. */
+  runoff: string[] | null;
 }
 
-export function positionOutcome(position: ResultPosition, ballots: number): PositionOutcome {
+// Under the majority rule a single-winner position needs more than half of the valid votes
+// (skipped ballots don't count), as in the UG SRC constitution, Article 30(7).
+export function positionOutcome(position: ResultPosition, ballots: number, majorityRule = false): PositionOutcome {
   const unopposed = position.candidates.length === 1;
   const ranked = [...position.candidates].sort((a, b) => b.votes - a.votes);
+  const totalChoices = position.candidates.reduce((sum, c) => sum + c.votes + c.no_votes, 0);
   const winners = new Set<string>();
   let tie = false;
+  let runoff: string[] | null = null;
 
   if (unopposed) {
     const only = ranked[0];
     if (only && only.votes > only.no_votes) winners.add(only.id);
     tie = Boolean(only && only.votes > 0 && only.votes === only.no_votes);
+  } else if (majorityRule && position.seats === 1) {
+    const top = ranked[0];
+    if (top && top.votes * 2 > totalChoices) {
+      winners.add(top.id);
+    } else if (totalChoices > 0) {
+      // Top two go through; anyone tied with second place goes through too.
+      const second = ranked[1]?.votes ?? 0;
+      runoff = ranked.filter((c, i) => i === 0 || (c.votes === second && c.votes > 0)).map((c) => c.id);
+      if (runoff.length < 2) runoff = ranked.slice(0, 2).map((c) => c.id);
+    }
   } else {
     const cutoff = ranked[position.seats - 1]?.votes ?? 0;
     const next = ranked[position.seats]?.votes ?? -1;
@@ -36,8 +52,14 @@ export function positionOutcome(position: ResultPosition, ballots: number): Posi
     tie,
     unopposed,
     skipped: Math.max(0, ballots - position.ballots_with_choice),
-    totalChoices: position.candidates.reduce((sum, c) => sum + c.votes + c.no_votes, 0),
+    totalChoices,
+    runoff,
   };
+}
+
+export function runoffsNeeded(results: Results, majorityRule: boolean): PositionOutcome[] {
+  if (!majorityRule) return [];
+  return results.positions.map((p) => positionOutcome(p, results.ballots, true)).filter((o) => o.runoff);
 }
 
 export interface CountCheck {
@@ -61,16 +83,20 @@ export function checkCount(results: Results): CountCheck {
     lines.push({
       ok,
       text: ok
-        ? `${p.title}: ${votes.toLocaleString()} choices on ${p.ballots_with_choice.toLocaleString()} ballots, within the limit.`
+        ? `${p.title}: ${votes.toLocaleString()} ${votes === 1 ? 'choice' : 'choices'} on ${p.ballots_with_choice.toLocaleString()} ${p.ballots_with_choice === 1 ? 'ballot' : 'ballots'}, within the limit.`
         : `${p.title}: more choices than ballots allow.`,
     });
   }
   return { ok: lines.every((l) => l.ok), lines };
 }
 
-export function summaryLines(results: Results): string[] {
+export function summaryLines(results: Results, majorityRule = false): string[] {
   return results.positions.map((p) => {
-    const o = positionOutcome(p, results.ballots);
+    const o = positionOutcome(p, results.ballots, majorityRule);
+    if (o.runoff) {
+      const names = o.ranked.filter((c) => o.runoff?.includes(c.id)).map((c) => `${c.name} (${c.votes})`);
+      return `${p.title}: nobody passed half the votes. Run-off between ${names.join(' and ')}`;
+    }
     if (o.unopposed) {
       const c = p.candidates[0];
       if (!c) return `${p.title}: no candidate`;

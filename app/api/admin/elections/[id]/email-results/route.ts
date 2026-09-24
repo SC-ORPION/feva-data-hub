@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const link = `${electionVotingUrl(e.organizations.slug, e.slug, req.nextUrl.origin)}/results`;
   const paragraphs = [
     `Voting in ${e.title} has closed. Here are the results:`,
-    ...summaryLines(results as Results),
+    ...summaryLines(results as Results, e.majority_rule),
     `See the full count: ${link}`,
   ];
 

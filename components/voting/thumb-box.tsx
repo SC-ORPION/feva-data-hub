@@ -5,12 +5,16 @@ export function ThumbBox({ selected, tone = 'accent' }: { selected: boolean; ton
   const on = tone === 'danger' ? 'border-danger bg-danger text-card' : 'border-accent bg-accent text-accent-ink';
   return (
     <span
-      className={`flex size-12 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-        selected ? on : 'border-dashed border-line-strong bg-paper text-transparent'
+      className={`flex size-12 shrink-0 items-center justify-center rounded-md border-2 transition-[background-color,border-color] duration-150 ease-[var(--ease-out)] ${
+        selected ? on : 'border-dashed border-line-strong bg-paper'
       }`}
       aria-hidden="true"
     >
-      <Fingerprint className="size-7" strokeWidth={1.75} />
+      {/* The thumbprint presses in, like ink on a paper ballot. */}
+      <Fingerprint
+        className={`size-7 transition-[opacity,transform] duration-200 ease-[var(--ease-out)] ${selected ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}
+        strokeWidth={1.75}
+      />
     </span>
   );
 }

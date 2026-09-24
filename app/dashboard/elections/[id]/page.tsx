@@ -1,15 +1,16 @@
 'use client';
 
-import { ArrowLeft, CheckCircle2, Circle, Lock, Mail, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowLeft, BellRing, CheckCircle2, Circle, Eye, GitBranch, Lock, Mail, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { BallotEditor } from '@/components/admin/ballot-editor';
 import { ShareBox } from '@/components/admin/share-box';
 import { VotersTab } from '@/components/admin/voters-tab';
-import { Button } from '@/components/ui/button';
+import { Button, buttonClass } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/dialog';
 import { Field, Input } from '@/components/ui/field';
+import { Meter } from '@/components/ui/meter';
 import { Notice } from '@/components/ui/notice';
 import { PageLoading } from '@/components/ui/spinner';
 import { PhasePill } from '@/components/ui/status';
@@ -22,7 +23,7 @@ import { downloadCsv, formatDateTime, formatTime, fromLocalInput, percent, plura
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/voting/errors';
 import { electionPhase } from '@/lib/voting/phase';
-import { checkCount, positionOutcome } from '@/lib/voting/tally';
+import { checkCount, positionOutcome, runoffsNeeded } from '@/lib/voting/tally';
 import type { Election, ElectionEvent, Position, Results } from '@/lib/voting/types';
 
 const TABS = ['overview', 'ballot', 'voters', 'results', 'activity'] as const;
@@ -37,6 +38,9 @@ const EVENT_TEXT: Record<string, (d: string | null) => string> = {
   closed: () => 'Voting closed',
   voter_data_deleted: () => 'Voter details deleted',
   results_emailed: (d) => `Results emailed to ${plural(Number(d), 'voter')}`,
+  reminders_sent: (d) => `Reminded ${plural(Number(d), 'person', 'people')} who hadn’t voted`,
+  runoff_created: () => 'Run-off set up',
+  runoff_created_from: (d) => `Set up as a run-off of ${d ?? 'an earlier election'}`,
 };
 
 function useNow(ms = 15000) {
@@ -63,17 +67,27 @@ export default function ElectionPage() {
   const [countedAt, setCountedAt] = useState<Date | null>(null);
   const [events, setEvents] = useState<ElectionEvent[]>([]);
   const [tab, setTab] = useState<Tab>('overview');
-  const [confirm, setConfirm] = useState<'open' | 'close' | 'delete' | null>(null);
+  const [confirm, setConfirm] = useState<'open' | 'close' | 'delete' | 'runoff' | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger' | 'warn'; text: string } | null>(null);
   const [ballotDraft, setBallotDraft] = useState<DraftPosition[] | null>(null);
   const [emailProgress, setEmailProgress] = useState<string | null>(null);
   const [endsEdit, setEndsEdit] = useState<string | null>(null);
+  const [parent, setParent] = useState<Pick<Election, 'id' | 'title'> | null>(null);
+  const [runoffs, setRunoffs] = useState<Pick<Election, 'id' | 'title'>[]>([]);
+  const [remind, setRemind] = useState<{ waiting: number } | null>(null);
 
   const loadElection = useCallback(async () => {
     const { data } = await supabase.from('elections').select('*').eq('id', id).maybeSingle();
     if (!data) return setMissing(true);
-    setElection(data as Election);
+    const e = data as Election;
+    setElection(e);
+    const [{ data: up }, { data: down }] = await Promise.all([
+      e.runoff_of ? supabase.from('elections').select('id, title').eq('id', e.runoff_of).maybeSingle() : Promise.resolve({ data: null }),
+      supabase.from('elections').select('id, title').eq('runoff_of', e.id).order('created_at'),
+    ]);
+    setParent(up ?? null);
+    setRunoffs(down ?? []);
   }, [supabase, id]);
 
   const loadCounts = useCallback(async () => {
@@ -212,6 +226,55 @@ export default function ElectionPage() {
     setBusy(null);
   }
 
+  async function askRemind() {
+    setMessage(null);
+    try {
+      const r = await adminFetch<{ waiting: number }>(`/api/admin/elections/${id}/remind`, { count: true });
+      setRemind(r);
+    } catch (e) {
+      setMessage({ tone: 'danger', text: e instanceof Error ? e.message : 'Something went wrong.' });
+    }
+  }
+
+  async function sendReminders() {
+    setRemind(null);
+    setMessage(null);
+    let after: string | undefined;
+    let offset = 0;
+    try {
+      for (;;) {
+        setEmailProgress(`Sending reminders (${offset.toLocaleString()} sent)`);
+        const r = await adminFetch<{ sent: number; nextOffset: number; after: string | null; done: boolean }>(
+          `/api/admin/elections/${id}/remind`,
+          { offset, after },
+        );
+        offset = r.nextOffset;
+        after = r.after ?? undefined;
+        if (r.done) break;
+      }
+      setMessage({ tone: 'success', text: `Reminded ${plural(offset, 'person', 'people')} who haven’t voted.` });
+    } catch (e) {
+      setMessage({ tone: 'danger', text: e instanceof Error ? e.message : 'Sending stopped. Try again.' });
+    }
+    setEmailProgress(null);
+    refreshAll();
+  }
+
+  async function createRunoff() {
+    if (!results || !election) return;
+    setBusy('runoff');
+    setMessage(null);
+    const needed = runoffsNeeded(results, election.majority_rule);
+    const { data, error } = await supabase.rpc('create_runoff', {
+      p_election: id,
+      p_positions: needed.map((o) => ({ position_id: o.position.id, candidate_ids: o.runoff })),
+    });
+    setBusy(null);
+    setConfirm(null);
+    if (error || !data) return setMessage({ tone: 'danger', text: friendlyError(error) });
+    router.push(`/dashboard/elections/${data}`);
+  }
+
   async function saveEnds() {
     if (endsEdit === null) return;
     const iso = fromLocalInput(endsEdit);
@@ -254,9 +317,17 @@ export default function ElectionPage() {
           <PhasePill phase={phase} />
         </div>
         <p className="mt-1 text-ink-2">
-          Voters sign in with {METHOD_LABEL[election.voter_method]} ·{' '}
+          Voters sign in with {METHOD_LABEL[election.voter_method]} · {election.majority_rule ? 'winners need more than half' : 'most votes wins'} ·{' '}
           {election.results_visibility === 'live' ? 'results show live' : 'results show after voting closes'}
         </p>
+        {parent && (
+          <p className="mt-2 text-sm text-ink-2">
+            Run-off of{' '}
+            <Link href={`/dashboard/elections/${parent.id}`} className="font-semibold text-accent hover:underline">
+              {parent.title}
+            </Link>
+          </p>
+        )}
       </div>
 
       {message && <Notice tone={message.tone}>{message.text}</Notice>}
@@ -305,6 +376,9 @@ export default function ElectionPage() {
                   <Button onClick={() => setConfirm('open')} disabled={!checks.every((c) => c.ok)}>
                     {scheduled ? 'Schedule voting' : 'Open voting'}
                   </Button>
+                  <Link href={`/dashboard/elections/${id}/preview`} className={buttonClass('secondary')}>
+                    <Eye className="size-4" aria-hidden="true" /> Preview as a voter
+                  </Link>
                   <Button variant="ghost" onClick={() => setConfirm('delete')} className="hover:!text-danger">
                     <Trash2 className="size-4" aria-hidden="true" /> Delete election
                   </Button>
@@ -324,9 +398,7 @@ export default function ElectionPage() {
                   </div>
                   <p className="font-mono text-2xl font-bold text-accent tabular">{turnout}%</p>
                 </div>
-                <div className="mt-3 h-3 overflow-hidden rounded-full bg-sunk">
-                  <div className="h-full rounded-full bg-accent transition-[width] duration-700" style={{ width: `${turnout}%` }} />
-                </div>
+                <Meter value={counts.voted} max={counts.total} className="mt-3 h-3" label="Turnout" />
                 {phase === 'open' && <p className="mt-2 text-xs text-ink-3">Updates by itself every few seconds.</p>}
               </section>
             )}
@@ -375,6 +447,17 @@ export default function ElectionPage() {
                     </Button>
                   </div>
                 )}
+                {election.voter_method !== 'code' && !election.voter_data_deleted_at && counts.total > counts.voted && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+                    <p className="text-sm text-ink-2">
+                      {plural(counts.total - counts.voted, 'person has', 'people have')} not voted yet.
+                      {election.reminded_at && ` Last reminder ${formatDateTime(election.reminded_at)}.`}
+                    </p>
+                    <Button variant="secondary" size="sm" onClick={askRemind} loading={Boolean(emailProgress)}>
+                      <BellRing className="size-4" aria-hidden="true" /> Send a reminder
+                    </Button>
+                  </div>
+                )}
               </section>
             )}
 
@@ -382,13 +465,40 @@ export default function ElectionPage() {
               <section className="grid gap-3 rounded-lg border border-line bg-card p-5">
                 <h2 className="font-bold">Voting closed {formatDateTime(election.closed_at ?? election.ends_at)}</h2>
                 <p className="text-sm text-ink-2">
-                  Results are public at the voting link. Check the count in the Results tab.
+                  Results and a public count check are live at the voting link. Candidates and their agents can check the count there
+                  themselves.
                   {election.results_emailed_at && ` Results were emailed on ${formatDateTime(election.results_emailed_at)}.`}
                 </p>
+                {results && runoffsNeeded(results, election.majority_rule).length > 0 && (
+                  <Notice
+                    tone="warn"
+                    title="A run-off is needed"
+                    action={
+                      runoffs.length ? (
+                        <Link href={`/dashboard/elections/${runoffs[0].id}`} className="font-semibold text-accent hover:underline">
+                          Go to {runoffs[0].title}
+                        </Link>
+                      ) : election.voter_data_deleted_at ? undefined : (
+                        <Button size="sm" onClick={() => setConfirm('runoff')}>
+                          <GitBranch className="size-4" aria-hidden="true" /> Set up the run-off
+                        </Button>
+                      )
+                    }
+                  >
+                    {runoffsNeeded(results, election.majority_rule)
+                      .map((o) => o.position.title)
+                      .join(', ')}{' '}
+                    {runoffsNeeded(results, election.majority_rule).length === 1 ? 'has' : 'have'} no candidate with more than half the valid votes.
+                    {election.voter_data_deleted_at && ' Voter details were deleted, so add the voter list to a new election by hand.'}
+                  </Notice>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <Button variant="secondary" onClick={() => selectTab('results')}>
                     See results
                   </Button>
+                  <a href={`${url}/audit`} target="_blank" rel="noreferrer" className={buttonClass('secondary')}>
+                    <ShieldCheck className="size-4" aria-hidden="true" /> Public count check
+                  </a>
                   {hasEmails && (
                     <Button variant="secondary" onClick={emailResults} loading={Boolean(emailProgress)}>
                       <Mail className="size-4" aria-hidden="true" /> {election.results_emailed_at ? 'Email results again' : 'Email results to voters'}
@@ -475,7 +585,7 @@ export default function ElectionPage() {
             {phase === 'open' && election.results_visibility === 'after_close' && (
               <Notice tone="info">Only you can see these numbers. Voters see them when voting closes.</Notice>
             )}
-            {results && phase !== 'draft' && <ResultsView results={results} phase={phase} />}
+            {results && phase !== 'draft' && <ResultsView results={results} phase={phase} majorityRule={election.majority_rule} />}
           </div>
           {results && phase !== 'draft' && (
             <aside className="grid content-start gap-4">
@@ -506,8 +616,14 @@ export default function ElectionPage() {
                       downloadCsv(`${election.slug}-results.csv`, [
                         ['Position', 'Candidate', 'Votes', 'No votes', 'Result'],
                         ...results.positions.flatMap((p) => {
-                          const o = positionOutcome(p, results.ballots);
-                          return o.ranked.map((c) => [p.title, c.name, c.votes, o.unopposed ? c.no_votes : '', o.winners.has(c.id) ? (phase === 'closed' ? 'Won' : 'Leading') : o.tie ? 'Tied' : '']);
+                          const o = positionOutcome(p, results.ballots, election.majority_rule);
+                          return o.ranked.map((c) => [
+                            p.title,
+                            c.name,
+                            c.votes,
+                            o.unopposed ? c.no_votes : '',
+                            o.winners.has(c.id) ? (phase === 'closed' ? 'Won' : 'Leading') : o.runoff?.includes(c.id) ? 'Run-off' : o.tie ? 'Tied' : '',
+                          ]);
                         }),
                         [],
                         ['Ballots cast', results.ballots],
@@ -563,6 +679,43 @@ export default function ElectionPage() {
         onCancel={() => setConfirm(null)}
       >
         Nobody can vote after this, and it can’t be reopened. {counts.total - counts.voted > 0 && `${plural(counts.total - counts.voted, 'person has', 'people have')} not voted yet.`}
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={confirm === 'runoff'}
+        title="Set up the run-off?"
+        confirmLabel="Yes, set it up"
+        busy={busy === 'runoff'}
+        onConfirm={createRunoff}
+        onCancel={() => setConfirm(null)}
+      >
+        <p>We’ll make a new draft election with the same {plural(counts.total, 'voter')}:</p>
+        <ul className="mt-2 grid gap-1">
+          {results &&
+            runoffsNeeded(results, election.majority_rule).map((o) => (
+              <li key={o.position.id}>
+                <span className="font-semibold text-ink">{o.position.title}:</span>{' '}
+                {o.ranked
+                  .filter((c) => o.runoff?.includes(c.id))
+                  .map((c) => c.name)
+                  .join(' vs ')}
+              </li>
+            ))}
+        </ul>
+        <p className="mt-2">
+          {election.voter_method === 'code' ? 'The same voting codes work, so voters can use their slips again. ' : ''}You can check it and then open
+          voting.
+        </p>
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={Boolean(remind)}
+        title={`Remind ${plural(remind?.waiting ?? 0, 'person', 'people')}?`}
+        confirmLabel="Send reminders"
+        onConfirm={sendReminders}
+        onCancel={() => setRemind(null)}
+      >
+        Everyone on the list who hasn’t voted gets {election.voter_method === 'phone' ? 'a text message' : 'an email'} with the voting link
+        {election.ends_at ? ' and the closing time' : ''}.{election.voter_method === 'phone' && ' Each text message costs money.'} You can send
+        another reminder after 30 minutes.
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm === 'delete'}

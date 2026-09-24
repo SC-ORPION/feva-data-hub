@@ -1,15 +1,17 @@
 'use client';
 
-import { ArrowLeft, ArrowRight, ListChecks } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Eye, ListChecks } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, buttonClass } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { ConfirmDialog } from '@/components/ui/dialog';
-import { Input, inputClass } from '@/components/ui/field';
+import { inputClass } from '@/components/ui/field';
+import { Meter } from '@/components/ui/meter';
 import { Notice } from '@/components/ui/notice';
 import { formatDateTime, formatTime } from '@/lib/format';
-import type { BallotChoice, Position, ReceiptChoice, VoterMethod } from '@/lib/voting/types';
+import type { BallotChoice, Candidate, Position, VoterMethod } from '@/lib/voting/types';
+import { ReceiptCheck } from './receipt-check';
 import { Initials, ThumbBox } from './thumb-box';
 
 interface Props {
@@ -17,6 +19,10 @@ interface Props {
   positions: Position[];
   base: string;
   slug: string;
+  /** Organizer preview: nothing is sent or saved. */
+  preview?: boolean;
+  /** Other elections of the same organization that are open right now. */
+  others?: { title: string; href: string }[];
 }
 
 type Step = 'identify' | 'otp' | 'ballot' | 'review' | 'done' | 'voted' | 'receipt';
@@ -40,65 +46,17 @@ async function post<T>(url: string, body: unknown): Promise<{ ok: true; data: T 
   }
 }
 
-function ReceiptCheck({ electionId, initial }: { electionId: string; initial?: string }) {
-  const [code, setCode] = useState(initial ?? '');
-  const [choices, setChoices] = useState<ReceiptChoice[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    const r = await post<{ choices: ReceiptChoice[] }>('/api/vote/receipt', { electionId, receipt: code });
-    setBusy(false);
-    if (!r.ok) return setError(r.error);
-    setChoices(r.data.choices);
-  }
-
-  return (
-    <div className="grid gap-4">
-      <form onSubmit={submit} className="grid gap-3">
-        <label htmlFor="receipt" className="text-sm font-semibold">
-          Receipt code
-        </label>
-        <div className="flex gap-2">
-          <Input
-            id="receipt"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="K7QM2-XP9RT"
-            className="font-mono tracking-wider"
-            autoCapitalize="characters"
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <Button type="submit" variant="secondary" loading={busy} className="!h-11">
-            Check
-          </Button>
-        </div>
-      </form>
-      {error && <Notice tone="danger">{error}</Notice>}
-      {choices && <ChoiceList items={choices.map((c) => ({ position: c.position, text: c.approve ? c.candidate : `No to ${c.candidate}` }))} />}
-      {choices?.length === 0 && <Notice tone="info">This ballot was submitted without choosing anyone.</Notice>}
-    </div>
+function Face({ c, size }: { c: Candidate; size: 'md' | 'lg' }) {
+  const px = size === 'lg' ? 64 : 56;
+  return c.photo_url ? (
+    // eslint-disable-next-line @next/next/no-img-element -- small resized upload
+    <img src={c.photo_url} alt="" width={px} height={px} decoding="async" className="size-16 shrink-0 rounded-md object-cover" />
+  ) : (
+    <Initials name={c.name} className="size-16 text-xl" />
   );
 }
 
-function ChoiceList({ items }: { items: { position: string; text: string; muted?: boolean }[] }) {
-  return (
-    <dl className="divide-y divide-line rounded-lg border border-line bg-card">
-      {items.map((c, i) => (
-        <div key={`${c.position}-${i}`} className="grid gap-0.5 px-4 py-3">
-          <dt className="text-sm text-ink-2">{c.position}</dt>
-          <dd className={`font-semibold ${c.muted ? 'text-warn' : ''}`}>{c.text}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-export function VoteFlow({ election, positions, base, slug }: Props) {
+export function VoteFlow({ election, positions, base, slug, preview = false, others = [] }: Props) {
   const storeKey = `fv-choices-${election.id}`;
   const [step, setStep] = useState<Step>('identify');
   const [value, setValue] = useState('');
@@ -122,6 +80,7 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
 
   // Pick up where the voter left off if the page reloads mid-ballot.
   useEffect(() => {
+    if (preview) return;
     let active = true;
     fetch(`/api/vote/session?election=${election.id}`)
       .then((r) => r.json())
@@ -138,13 +97,14 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
     return () => {
       active = false;
     };
-  }, [election.id, storeKey]);
+  }, [election.id, storeKey, preview]);
 
   useEffect(() => {
+    if (preview) return;
     try {
       sessionStorage.setItem(storeKey, JSON.stringify(choices));
     } catch {}
-  }, [choices, storeKey]);
+  }, [choices, storeKey, preview]);
 
   useEffect(() => {
     if (wait <= 0) return;
@@ -172,6 +132,10 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
 
   async function identify(e?: FormEvent) {
     e?.preventDefault();
+    if (preview) {
+      setIndex(0);
+      return show('ballot');
+    }
     setBusy(true);
     setError(null);
     const r = await post<{ step: 'otp' | 'ballot'; ticket?: string; sentTo?: string; channel?: 'email' | 'sms'; resendIn?: number; testCode?: string; name?: string | null }>(
@@ -220,6 +184,12 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
   }
 
   async function submit() {
+    if (preview) {
+      setConfirming(false);
+      setReceipt('PREVI-EW000');
+      setVotedAt(new Date().toISOString());
+      return show('done');
+    }
     setBusy(true);
     const ballot: BallotChoice[] = positions
       .filter((p) => choices[p.id]?.ids.length)
@@ -259,7 +229,7 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
     if (!position) return;
     const only = position.candidates[0].id;
     setChoices((prev) => {
-      const same = prev[position.id]?.ids.length && prev[position.id]?.approve === approve;
+      const same = prev[position.id]?.ids.length && (prev[position.id]?.approve ?? true) === approve;
       return { ...prev, [position.id]: same ? { ids: [] } : { ids: [only], approve } };
     });
   }
@@ -285,6 +255,15 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
 
   return (
     <div ref={topRef} className="scroll-mt-4">
+      {preview && (
+        <div className="mb-4 flex items-center gap-2 rounded-md bg-warn-soft px-3 py-2 text-sm text-ink">
+          <Eye className="size-4 shrink-0 text-warn" aria-hidden="true" />
+          <span>
+            <span className="font-semibold">Preview.</span> This is what voters see. Nothing you do here is sent or counted.
+          </span>
+        </div>
+      )}
+
       <div className="mt-4 mb-6">
         <h1 className="text-2xl font-bold">{election.title}</h1>
         {step === 'identify' && election.description && <p className="mt-2 whitespace-pre-line text-ink-2">{election.description}</p>}
@@ -297,7 +276,7 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
       )}
 
       {step === 'identify' && (
-        <form onSubmit={identify} className="grid gap-5">
+        <form key="identify" onSubmit={identify} className="rise-in grid gap-5">
           <div className="grid gap-1.5">
             <label htmlFor="who" className="text-lg font-bold">
               {ask.label}
@@ -316,7 +295,7 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
               value={value}
               onChange={(e) => setValue(e.target.value)}
               aria-describedby="who-hint"
-              required
+              required={!preview}
               className={`${inputClass} mt-1 h-14 text-lg ${election.voter_method === 'code' ? 'font-mono tracking-wider uppercase' : ''}`}
             />
           </div>
@@ -326,11 +305,11 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
           <p className="text-sm text-ink-2">
             {election.voter_method === 'code'
               ? 'Your code lets you vote once. Nobody can see who you voted for.'
-              : `We’ll send you a 6-digit code to make sure it’s you. Nobody can see who you voted for.`}
+              : 'We’ll send you a 6-digit code to make sure it’s you. Nobody can see who you voted for.'}
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-4 text-sm">
             <button type="button" onClick={() => show('receipt')} className="font-semibold text-accent hover:underline">
-              Already voted? Check my vote
+              Already voted? Check your ballot was counted
             </button>
             {election.resultsLive && (
               <Link href={resultsHref} className="font-semibold text-accent hover:underline">
@@ -343,11 +322,12 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
 
       {step === 'otp' && (
         <form
+          key="otp"
           onSubmit={(e) => {
             e.preventDefault();
             verify(otp);
           }}
-          className="grid gap-5"
+          className="rise-in grid gap-5"
         >
           <div>
             <h2 className="text-lg font-bold">{channel === 'email' ? 'Check your email' : 'Check your messages'}</h2>
@@ -402,99 +382,106 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
               <span>
                 Position {index + 1} of {positions.length}
               </span>
-              <span>
-                {unopposed ? 'Yes or No' : position.seats === 1 ? 'Choose one' : `Choose up to ${position.seats}`}
-              </span>
+              <span>{unopposed ? 'Yes or No' : position.seats === 1 ? 'Choose one' : `Choose up to ${position.seats}`}</span>
             </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunk">
-              <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${((index + 1) / positions.length) * 100}%` }} />
-            </div>
+            <Meter value={index + 1} max={positions.length} className="mt-2 h-1.5" />
           </div>
 
-          <h2 className="text-2xl font-bold">{position.title}</h2>
+          <div key={position.id} className="rise-in grid gap-5">
+            <h2 className="text-2xl font-bold">{position.title}</h2>
 
-          {unopposed ? (
-            <div className="grid gap-4">
-              <div className="flex items-center gap-4 rounded-lg border border-line bg-card p-4">
-                {/* eslint-disable-next-line @next/next/no-img-element -- small resized upload */}
-                {position.candidates[0].photo_url ? <img src={position.candidates[0].photo_url} alt="" className="size-16 rounded-md object-cover" /> : <Initials name={position.candidates[0].name} className="size-16 text-xl" />}
-                <div>
-                  <p className="text-lg font-bold">{position.candidates[0].name}</p>
-                  {position.candidates[0].bio && <p className="text-ink-2">{position.candidates[0].bio}</p>}
+            {unopposed ? (
+              <div className="grid gap-4">
+                <div className="flex items-center gap-4 rounded-lg border border-line bg-card p-4">
+                  <Face c={position.candidates[0]} size="lg" />
+                  <div>
+                    <p className="text-lg font-bold">{position.candidates[0].name}</p>
+                    {position.candidates[0].bio && <p className="text-ink-2">{position.candidates[0].bio}</p>}
+                  </div>
                 </div>
+                <p className="text-ink-2">
+                  {position.candidates[0].name} is the only candidate. Do you want them as {position.title}?
+                </p>
+                <fieldset className="grid grid-cols-2 gap-3">
+                  <legend className="sr-only">{position.title}: yes or no</legend>
+                  {[true, false].map((yes) => {
+                    const on = picked.length > 0 && (choice?.approve ?? true) === yes;
+                    return (
+                      <label
+                        key={String(yes)}
+                        className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border-2 p-4 text-xl font-bold transition-[background-color,border-color,transform] duration-150 ease-[var(--ease-out)] active:scale-[0.98] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent ${
+                          on ? (yes ? 'border-accent bg-accent-soft' : 'border-danger bg-danger-soft') : 'border-line bg-card hover:border-line-strong'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name={`pos-${position.id}`}
+                          checked={on}
+                          onChange={() => answer(yes)}
+                          onClick={(e) => {
+                            // Tapping the chosen answer again clears it, so voters can skip.
+                            if (on) {
+                              e.preventDefault();
+                              answer(yes);
+                            }
+                          }}
+                          className="sr-only"
+                        />
+                        {yes ? 'Yes' : 'No'}
+                        <ThumbBox selected={on} tone={yes ? 'accent' : 'danger'} />
+                      </label>
+                    );
+                  })}
+                </fieldset>
               </div>
-              <p className="text-ink-2">
-                {position.candidates[0].name} is the only candidate. Do you want them as {position.title}?
-              </p>
-              <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label={`${position.title}: yes or no`}>
-                {[true, false].map((yes) => {
-                  const on = picked.length > 0 && (choice?.approve ?? true) === yes;
+            ) : (
+              <fieldset className="grid gap-3">
+                <legend className="sr-only">{position.title}</legend>
+                {position.candidates.map((c) => {
+                  const on = picked.includes(c.id);
+                  const full = !on && position.seats > 1 && picked.length >= position.seats;
                   return (
-                    <button
-                      key={String(yes)}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      onClick={() => answer(yes)}
-                      className={`flex items-center justify-between gap-3 rounded-lg border-2 p-4 text-xl font-bold transition-colors ${
-                        on ? (yes ? 'border-accent bg-accent-soft' : 'border-danger bg-danger-soft') : 'border-line bg-card hover:border-line-strong'
+                    <label
+                      key={c.id}
+                      className={`flex cursor-pointer items-center gap-4 rounded-lg border-2 p-3 transition-[background-color,border-color,opacity,transform] duration-150 ease-[var(--ease-out)] active:scale-[0.98] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent ${
+                        on ? 'border-accent bg-accent-soft' : full ? 'border-line bg-card opacity-55' : 'border-line bg-card hover:border-line-strong'
                       }`}
                     >
-                      {yes ? 'Yes' : 'No'}
-                      <ThumbBox selected={on} tone={yes ? 'accent' : 'danger'} />
-                    </button>
+                      <input
+                        type={position.seats === 1 ? 'radio' : 'checkbox'}
+                        name={`pos-${position.id}`}
+                        checked={on}
+                        disabled={full}
+                        onChange={() => toggle(c.id)}
+                        onClick={(e) => {
+                          // Tapping a chosen radio again clears it, so voters can skip.
+                          if (position.seats === 1 && on) {
+                            e.preventDefault();
+                            toggle(c.id);
+                          }
+                        }}
+                        className="sr-only"
+                      />
+                      <Face c={c} size="lg" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-lg leading-snug font-bold">{c.name}</span>
+                        {c.bio && <span className="mt-0.5 block text-sm text-ink-2">{c.bio}</span>}
+                      </span>
+                      <ThumbBox selected={on} />
+                    </label>
                   );
                 })}
-              </div>
-            </div>
-          ) : (
-            <fieldset className="grid gap-3">
-              <legend className="sr-only">{position.title}</legend>
-              {position.candidates.map((c) => {
-                const on = picked.includes(c.id);
-                const full = !on && position.seats > 1 && picked.length >= position.seats;
-                return (
-                  <label
-                    key={c.id}
-                    className={`flex cursor-pointer items-center gap-4 rounded-lg border-2 p-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent ${
-                      on ? 'border-accent bg-accent-soft' : full ? 'border-line bg-card opacity-55' : 'border-line bg-card hover:border-line-strong'
-                    }`}
-                  >
-                    <input
-                      type={position.seats === 1 ? 'radio' : 'checkbox'}
-                      name={`pos-${position.id}`}
-                      checked={on}
-                      disabled={full}
-                      onChange={() => toggle(c.id)}
-                      onClick={(e) => {
-                        // Tapping a chosen radio again clears it, so voters can skip.
-                        if (position.seats === 1 && on) {
-                          e.preventDefault();
-                          toggle(c.id);
-                        }
-                      }}
-                      className="sr-only"
-                    />
-                    {/* eslint-disable-next-line @next/next/no-img-element -- small resized upload */}
-                    {c.photo_url ? <img src={c.photo_url} alt="" className="size-16 shrink-0 rounded-md object-cover" /> : <Initials name={c.name} className="size-16 text-xl" />}
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-lg leading-snug font-bold">{c.name}</span>
-                      {c.bio && <span className="mt-0.5 block text-sm text-ink-2">{c.bio}</span>}
-                    </span>
-                    <ThumbBox selected={on} />
-                  </label>
-                );
-              })}
-              {position.seats > 1 && (
-                <p className="text-sm text-ink-2" aria-live="polite">
-                  {picked.length} of {position.seats} chosen
-                  {picked.length >= position.seats && '. Tap someone you chose to remove them.'}
-                </p>
-              )}
-            </fieldset>
-          )}
+                {position.seats > 1 && (
+                  <p className="text-sm text-ink-2" aria-live="polite">
+                    {picked.length} of {position.seats} chosen
+                    {picked.length >= position.seats && '. Tap someone you chose to remove them.'}
+                  </p>
+                )}
+              </fieldset>
+            )}
+          </div>
 
-          <div className="fixed inset-x-0 bottom-0 border-t border-line bg-card/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] backdrop-blur">
+          <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-card/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] backdrop-blur">
             <div className="mx-auto flex max-w-xl gap-3">
               <Button
                 variant="secondary"
@@ -525,7 +512,7 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
       )}
 
       {step === 'review' && (
-        <div className="grid gap-5">
+        <div key="review" className="rise-in grid gap-5">
           <div className="flex items-center gap-2">
             <ListChecks className="size-6 text-accent" aria-hidden="true" />
             <h2 className="text-xl font-bold">Check your choices</h2>
@@ -574,7 +561,7 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
       )}
 
       {step === 'done' && (
-        <div className="grid gap-6">
+        <div key="done" className="grid gap-6">
           <div className="flex items-center gap-5 rounded-lg border border-line bg-card p-5">
             <span className="voted-stamp inline-block shrink-0 rounded-md border-[3px] border-double border-mark px-3 py-1.5 font-mono text-xl font-bold tracking-[0.2em] text-mark">
               VOTED
@@ -589,8 +576,8 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
             <h3 className="font-bold">Your receipt code</h3>
             <p className="font-mono text-3xl font-bold tracking-wider text-mark">{receipt}</p>
             <p className="text-sm text-ink-2">
-              Keep it private. With it, you can check your choices later. Nobody else can link this code to you.
-              {emailed && ' We also emailed it to you.'}
+              Keep it private. With it you can check that your ballot was counted. It never shows how you voted, so nobody can use it to
+              pressure you.{emailed && ' We also emailed it to you.'}
             </p>
             <div>
               <CopyButton text={receipt} label="Copy code" />
@@ -599,29 +586,57 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
 
           <section className="grid gap-2">
             <h3 className="text-sm font-bold text-ink-2">You voted for</h3>
-            <ChoiceList items={positions.map((p) => ({ position: p.title, ...summaryFor(p) }))} />
+            <dl className="divide-y divide-line rounded-lg border border-line bg-card">
+              {positions.map((p) => {
+                const s = summaryFor(p);
+                return (
+                  <div key={p.id} className="grid gap-0.5 px-4 py-3">
+                    <dt className="text-sm text-ink-2">{p.title}</dt>
+                    <dd className={`font-semibold ${s.muted ? 'text-warn' : ''}`}>{s.text}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+            <p className="text-xs text-ink-3">This list is only shown now. It won’t be shown again.</p>
           </section>
 
-          <div className="flex flex-wrap gap-3">
-            {election.resultsLive && (
-              <Link href={resultsHref} className={buttonClass('primary', 'lg')}>
-                See live results
+          {others.length > 0 && (
+            <section className="grid gap-2">
+              <h3 className="font-bold">Also open for voting</h3>
+              <ul className="grid gap-2">
+                {others.map((o) => (
+                  <li key={o.href}>
+                    <Link href={o.href} className={buttonClass('secondary', 'lg', 'w-full justify-between')}>
+                      {o.title} <ArrowRight className="size-5" aria-hidden="true" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {!preview && (
+            <div className="flex flex-wrap gap-3">
+              {election.resultsLive && (
+                <Link href={resultsHref} className={buttonClass('primary', 'lg')}>
+                  See live results
+                </Link>
+              )}
+              <Link href={base || '/'} className={buttonClass('secondary', 'lg')}>
+                Done
               </Link>
-            )}
-            <Link href={base || '/'} className={buttonClass('secondary', 'lg')}>
-              Done
-            </Link>
-          </div>
+            </div>
+          )}
         </div>
       )}
 
       {step === 'voted' && (
-        <div className="grid gap-5">
+        <div key="voted" className="rise-in grid gap-5">
           <Notice tone="success" title="You have already voted">
             {votedAt ? `Your vote was saved on ${formatDateTime(votedAt)}.` : 'Your vote was saved.'} Each person can vote once.
           </Notice>
           <div className="grid gap-3">
-            <h2 className="font-bold">See what you chose</h2>
+            <h2 className="font-bold">Check your ballot was counted</h2>
             <p className="-mt-2 text-sm text-ink-2">Enter the receipt code you got after voting.</p>
             <ReceiptCheck electionId={election.id} />
           </div>
@@ -634,9 +649,9 @@ export function VoteFlow({ election, positions, base, slug }: Props) {
       )}
 
       {step === 'receipt' && (
-        <div className="grid gap-5">
+        <div key="receipt" className="rise-in grid gap-5">
           <div>
-            <h2 className="text-lg font-bold">Check my vote</h2>
+            <h2 className="text-lg font-bold">Check your ballot was counted</h2>
             <p className="text-ink-2">Enter the receipt code you got after voting.</p>
           </div>
           <ReceiptCheck electionId={election.id} />

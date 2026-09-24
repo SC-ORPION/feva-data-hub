@@ -1,4 +1,4 @@
-import { ArrowRight, KeyRound, ListChecks, Printer, Receipt, ShieldCheck, Trash2 } from 'lucide-react';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { ButtonLink } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
 import { Initials, ThumbBox } from '@/components/voting/thumb-box';
@@ -71,13 +71,51 @@ const STEPS = [
 ];
 
 const PROMISES = [
-  { icon: ShieldCheck, title: 'Secret ballot', body: 'Nobody can see who voted for whom. Not the organizers and not us.' },
-  { icon: KeyRound, title: 'One person, one vote', body: 'Once someone votes, their email, number or code is used up.' },
-  { icon: Receipt, title: 'A receipt for every voter', body: 'Each voter gets a code that lets them check their own vote later.' },
-  { icon: Trash2, title: 'You own your list', body: 'Delete everyone’s details when you are done. The results stay.' },
-  { icon: ListChecks, title: 'Count you can check', body: 'Recount from the ballots at any time and match it to turnout.' },
-  { icon: Printer, title: 'Works without smartphones', body: 'Print code slips, and let students vote on a shared computer.' },
+  ['Secret ballot', 'Nobody can see who voted for whom. Not the organizers and not us.'],
+  ['One person, one vote', 'Once someone votes, their email, number or code is used up.'],
+  ['A receipt nobody can buy', 'Voters can check their ballot was counted, but can’t prove to anyone how they voted.'],
+  ['50% + 1 and run-offs', 'If nobody passes half the votes, start a run-off between the top two, with the same voters.'],
+  ['Works without smartphones', 'Print code slips, and let students vote on a shared computer.'],
+  ['You own your list', 'Delete everyone’s details when the vote is over. The results stay.'],
 ];
+
+function CountCheckPreview() {
+  return (
+    <figure className="grid gap-3">
+      <div className="rounded-lg border border-line bg-card shadow-[0_24px_60px_-32px_rgba(19,32,26,0.35)]">
+        <div className="border-b border-line px-5 py-3.5">
+          <p className="font-bold">Check the count: SRC Elections 2026</p>
+        </div>
+        <dl className="grid grid-cols-3 divide-x divide-line border-b border-line">
+          {[
+            ['Ballots counted', '2,418'],
+            ['Marked as voted', '2,418'],
+            ['On the list', '3,050'],
+          ].map(([label, n]) => (
+            <div key={label} className="px-4 py-3">
+              <dt className="text-xs text-ink-2">{label}</dt>
+              <dd className="font-mono text-xl font-bold tabular">{n}</dd>
+            </div>
+          ))}
+        </dl>
+        <ul className="grid gap-2 px-5 py-4 text-sm">
+          <li className="flex gap-2">
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+            2,418 ballots match 2,418 people marked as voted.
+          </li>
+          <li className="flex gap-2">
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+            Your ballot fingerprint <span className="font-mono font-bold">3F9A2C71E0</span> is in the count.
+          </li>
+        </ul>
+        <p className="border-t border-line bg-warn-soft px-5 py-3 text-sm">
+          <span className="font-bold text-warn">President: run-off needed.</span> Nobody passed half of the valid votes.
+        </p>
+      </div>
+      <figcaption className="text-sm text-ink-3">An example of the public page every candidate can open after voting closes.</figcaption>
+    </figure>
+  );
+}
 
 export default function Home() {
   return (
@@ -101,8 +139,8 @@ export default function Home() {
               Run a fair vote from anyone’s phone.
             </h1>
             <p className="mt-5 text-lg text-ink-2">
-              Set up your school, church or group election in a few minutes. Voters sign in with a one-time code,
-              vote in under a minute, and the count is ready the moment voting closes.
+              Set up your school, church or group election and share one link. Each voter signs in with a one-time code
+              sent to them, votes one position at a time, and the count is ready the moment voting closes.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <ButtonLink href="/signup" size="lg">
@@ -122,9 +160,11 @@ export default function Home() {
             <h2 className="text-2xl font-bold">How it works</h2>
             <ol className="mt-8 grid gap-8 md:grid-cols-3">
               {STEPS.map((s, i) => (
-                <li key={s.title} className="grid content-start gap-2">
-                  <span className="font-mono text-sm font-bold text-accent">Step {i + 1}</span>
-                  <h3 className="text-lg font-bold">{s.title}</h3>
+                <li key={s.title} className="grid content-start gap-2 border-t-2 border-ink pt-4">
+                  <h3 className="flex items-baseline gap-3 text-lg font-bold">
+                    <span className="font-mono text-accent tabular">{i + 1}</span>
+                    {s.title}
+                  </h3>
                   <p className="text-ink-2">{s.body}</p>
                 </li>
               ))}
@@ -133,31 +173,29 @@ export default function Home() {
         </section>
 
         <section className="border-t border-line py-16">
-          <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-[1fr_2fr]">
+          <div className="mx-auto grid max-w-6xl items-start gap-12 md:grid-cols-2">
             <div>
-              <h2 className="text-2xl font-bold">Built so people trust the result</h2>
-              <p className="mt-3 text-ink-2">
-                The rules are enforced by the system, not by a volunteer at a table. Losing candidates can see the
-                count was fair.
+              <h2 className="text-2xl font-bold">A result the losing side accepts</h2>
+              <p className="mt-3 max-w-lg text-ink-2">
+                The rules are enforced by the system, not by a volunteer at a table. When voting closes, a public page lets every
+                candidate and agent check the count for themselves.
               </p>
-            </div>
-            <ul className="grid gap-x-8 gap-y-7 sm:grid-cols-2">
-              {PROMISES.map(({ icon: Icon, title, body }) => (
-                <li key={title} className="flex gap-3">
-                  <Icon className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
-                  <div>
-                    <h3 className="font-bold">{title}</h3>
-                    <p className="mt-0.5 text-ink-2">{body}</p>
+              <dl className="mt-8 grid gap-5">
+                {PROMISES.map(([title, body]) => (
+                  <div key={title} className="grid gap-0.5 sm:grid-cols-[12rem_1fr] sm:gap-6">
+                    <dt className="font-bold">{title}</dt>
+                    <dd className="text-ink-2">{body}</dd>
                   </div>
-                </li>
-              ))}
-            </ul>
+                ))}
+              </dl>
+            </div>
+            <CountCheckPreview />
           </div>
         </section>
 
         <section className="border-t border-line py-16">
           <div className="mx-auto max-w-6xl">
-            <h2 className="text-2xl font-bold">Who uses it</h2>
+            <h2 className="text-2xl font-bold">Made for</h2>
             <dl className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 ['Universities and colleges', 'SRC, JCR, hall and department elections'],
@@ -172,7 +210,7 @@ export default function Home() {
               ))}
             </dl>
             <div className="mt-14 flex flex-wrap items-center justify-between gap-4 rounded-lg bg-ink px-6 py-6 text-paper">
-              <p className="text-lg font-bold">Your first election takes about ten minutes to set up.</p>
+              <p className="text-lg font-bold">Try it with a small test election first. Nothing goes live until you open voting.</p>
               <ButtonLink href="/signup" size="lg" className="bg-paper !text-ink hover:bg-sunk">
                 Start an election
               </ButtonLink>

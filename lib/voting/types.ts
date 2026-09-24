@@ -28,6 +28,9 @@ export interface Election {
   closed_at: string | null;
   results_visibility: ResultsVisibility;
   email_results: boolean;
+  majority_rule: boolean;
+  runoff_of: string | null;
+  reminded_at: string | null;
   results_emailed_at: string | null;
   voter_data_deleted_at: string | null;
   created_at: string;

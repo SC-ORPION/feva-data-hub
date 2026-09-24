@@ -6,7 +6,9 @@ import { buttonClass } from '@/components/ui/button';
 import { VoteFlow } from '@/components/voting/vote-flow';
 import { VoterShell } from '@/components/voting/voter-shell';
 import { formatDateTime } from '@/lib/format';
+import { supabaseAdmin } from '@/lib/supabase/server';
 import { electionPhase, resultsArePublic } from '@/lib/voting/phase';
+import type { Election } from '@/lib/voting/types';
 import { loadBallot, loadElectionBySlug } from '@/lib/voting/server';
 import { voterBase } from '@/lib/voting/voter-base';
 
@@ -51,9 +53,14 @@ export default async function ElectionVotingPage({ params }: { params: Params })
                   {election.closed_at || election.ends_at ? `It closed on ${formatDateTime(election.closed_at ?? election.ends_at)}.` : 'Thank you to everyone who voted.'}
                 </p>
               </div>
-              <Link href={resultsHref} className={buttonClass('primary', 'lg', 'justify-self-start')}>
-                See the results
-              </Link>
+              <div className="flex flex-wrap gap-3">
+                <Link href={resultsHref} className={buttonClass('primary', 'lg')}>
+                  See the results
+                </Link>
+                <Link href={`${base}/${election.slug}/audit`} className={buttonClass('secondary', 'lg')}>
+                  Check the count
+                </Link>
+              </div>
             </>
           )}
         </div>
@@ -61,7 +68,18 @@ export default async function ElectionVotingPage({ params }: { params: Params })
     );
   }
 
-  const positions = await loadBallot(election.id);
+  const [positions, { data: siblings }] = await Promise.all([
+    loadBallot(election.id),
+    supabaseAdmin()
+      .from('elections')
+      .select('title, slug, status, starts_at, ends_at')
+      .eq('org_id', election.org_id)
+      .eq('status', 'open')
+      .neq('id', election.id),
+  ]);
+  const others = ((siblings ?? []) as Pick<Election, 'title' | 'slug' | 'status' | 'starts_at' | 'ends_at'>[])
+    .filter((e) => electionPhase(e) === 'open')
+    .map((e) => ({ title: e.title, href: `${base}/${e.slug}` }));
 
   return (
     <VoterShell orgName={election.organizations.name} homeHref={base || '/'}>
@@ -76,6 +94,7 @@ export default async function ElectionVotingPage({ params }: { params: Params })
         positions={positions}
         base={base}
         slug={election.slug}
+        others={others}
       />
     </VoterShell>
   );
