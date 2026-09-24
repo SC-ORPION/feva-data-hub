@@ -21,12 +21,12 @@ import type { ResultsVisibility, VoterMethod, VoterRow } from '@/lib/voting/type
 
 const STEPS = ['About this vote', 'How voters sign in', 'Voter list', 'Positions and candidates', 'Timing and rules', 'Check and create'];
 
-type Template = 'school' | 'church' | 'group' | 'other';
+type Template = 'org' | 'board' | 'leadership' | 'other';
 const TEMPLATES: Record<Template, { label: string; example: string; positions: [string, number][] }> = {
-  school: { label: 'School or college', example: 'SRC Elections 2026', positions: [['President', 1], ['Vice President', 1], ['General Secretary', 1], ['Treasurer', 1]] },
-  church: { label: 'Church', example: 'Church Council Elections 2026', positions: [['Chairperson', 1], ['Secretary', 1], ['Treasurer', 1], ['Committee Members', 3]] },
-  group: { label: 'Association or club', example: 'Executive Elections 2026', positions: [['Chairperson', 1], ['Vice Chairperson', 1], ['Secretary', 1], ['Organizer', 1]] },
-  other: { label: 'Something else', example: 'Annual Elections', positions: [['', 1]] },
+  org: { label: 'Organization leadership', example: 'Leadership Elections 2026', positions: [['Chairperson', 1], ['Secretary', 1], ['Treasurer', 1], ['Member', 1]] },
+  board: { label: 'Board of directors', example: 'Board Elections 2026', positions: [['Chair', 1], ['Vice Chair', 1], ['Secretary', 1], ['Directors', 3]] },
+  leadership: { label: 'Representative roles', example: 'Elections 2026', positions: [['Head', 1], ['Deputy', 1], ['Coordinator', 1], ['Officer', 1]] },
+  other: { label: 'Custom', example: 'Election 2026', positions: [['', 1]] },
 };
 
 const METHODS: { id: VoterMethod; icon: typeof Mail; title: string; body: string }[] = [

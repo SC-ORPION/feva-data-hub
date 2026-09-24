@@ -24,7 +24,7 @@ export default function SignupPage() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (org.trim().length < 2) return setError('Enter the name of your school, church or group.');
+    if (org.trim().length < 2) return setError('Enter the name of your organization.');
     if (password.length < 8) return setError('Use a password with at least 8 characters.');
     setBusy(true);
     const supabase = supabaseBrowser();
@@ -76,11 +76,11 @@ export default function SignupPage() {
     >
       <form onSubmit={submit} className="grid gap-5" noValidate>
         <Field
-          label="Name of your school, church or group"
-          htmlFor="org"
-          hint="Voters will see this name, for example “Achimota School SRC” or “Christ Church Youth”."
+          label=”Organization name”
+          htmlFor=”org”
+          hint=”Voters will see this name when they vote.”
         >
-          <Input id="org" value={org} onChange={(e) => setOrg(e.target.value)} required maxLength={120} autoComplete="organization" />
+          <Input id=”org” value={org} onChange={(e) => setOrg(e.target.value)} required maxLength={120} autoComplete=”organization” />
         </Field>
         <Field label="Your name" htmlFor="name">
           <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" />
@@ -88,7 +88,7 @@ export default function SignupPage() {
         <Field
           label="Your email"
           htmlFor="email"
-          hint="An official email (like you@knust.edu.gh) helps us approve your organization faster."
+          hint="An organization email helps us approve you faster."
         >
           <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
         </Field>

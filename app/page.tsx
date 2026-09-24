@@ -9,8 +9,8 @@ function BallotPreview() {
     <div className="relative mx-auto w-full max-w-sm" aria-label="Example of a ballot on a phone">
       <div className="rounded-lg border border-line bg-card shadow-[0_24px_60px_-28px_rgba(19,32,26,0.35)]">
         <div className="border-b border-line px-5 py-4">
-          <p className="text-xs font-semibold tracking-wide text-ink-3 uppercase">Achimota School SRC</p>
-          <p className="font-bold">SRC Elections 2026</p>
+          <p className="text-xs font-semibold tracking-wide text-ink-3 uppercase">Leadership Election</p>
+          <p className="font-bold">Election 2026</p>
         </div>
         <div className="px-5 pt-4">
           <div className="flex items-center justify-between text-xs text-ink-2">
@@ -20,12 +20,12 @@ function BallotPreview() {
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunk">
             <div className="h-full w-1/4 rounded-full bg-accent" />
           </div>
-          <p className="mt-4 text-xl font-bold">SRC President</p>
+          <p className="mt-4 text-xl font-bold">Chair</p>
         </div>
         <ul className="grid gap-2 p-5">
           {[
-            { name: 'Kwame Asante', note: 'Form 3 Science', on: false },
-            { name: 'Efua Owusu', note: 'Form 3 General Arts', on: true },
+            { name: 'Kwame Asante', note: 'Candidate', on: false },
+            { name: 'Efua Owusu', note: 'Candidate', on: true },
           ].map((c) => (
             <li
               key={c.name}
@@ -58,7 +58,7 @@ function BallotPreview() {
 const STEPS = [
   {
     title: 'Add your voters',
-    body: 'Upload a list of emails, phone numbers or student IDs. No list? Print a private voting code for each person instead.',
+    body: 'Upload a list of emails, phone numbers or IDs. No list? Print a private voting code for each person instead.',
   },
   {
     title: 'Share one link',
@@ -71,12 +71,12 @@ const STEPS = [
 ];
 
 const PROMISES = [
-  ['Secret ballot', 'Nobody can see who voted for whom. Not the organizers and not us.'],
-  ['One person, one vote', 'Once someone votes, their email, number or code is used up.'],
-  ['A receipt nobody can buy', 'Voters can check their ballot was counted, but can’t prove to anyone how they voted.'],
-  ['50% + 1 and run-offs', 'If nobody passes half the votes, start a run-off between the top two, with the same voters.'],
-  ['Works without smartphones', 'Print code slips, and let students vote on a shared computer.'],
-  ['You own your list', 'Delete everyone’s details when the vote is over. The results stay.'],
+  [‘Secret ballot’, ‘Nobody can see who voted for whom. Not the organizers and not us.’],
+  [‘One person, one vote’, ‘Once someone votes, their email, number or code is used up.’],
+  [‘A receipt nobody can buy’, ‘Voters can check their ballot was counted, but can’t prove to anyone how they voted.’],
+  [‘50% + 1 and run-offs’, ‘If nobody passes half the votes, start a run-off between the top two, with the same voters.’],
+  [‘Works without smartphones’, ‘Print code slips, and let people vote on a shared computer.’],
+  [‘You own your list’, ‘Delete everyone’s details when the vote is over. The results stay.’],
 ];
 
 function CountCheckPreview() {
@@ -139,7 +139,7 @@ export default function Home() {
               Run a fair vote from anyone’s phone.
             </h1>
             <p className="mt-5 text-lg text-ink-2">
-              Set up your school, church or group election and share one link. Each voter signs in with a one-time code
+              Set up an election for any organization and share one link. Each voter signs in with a one-time code
               sent to them, votes one position at a time, and the count is ready the moment voting closes.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -195,13 +195,13 @@ export default function Home() {
 
         <section className="border-t border-line py-16">
           <div className="mx-auto max-w-6xl">
-            <h2 className="text-2xl font-bold">Made for</h2>
+            <h2 className="text-2xl font-bold">Works for any group</h2>
             <dl className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {[
-                ['Universities and colleges', 'SRC, JCR, hall and department elections'],
-                ['Senior high schools', 'Prefects, house captains and class reps'],
-                ['Churches', 'Council, committee and youth fellowship elections'],
-                ['Groups and associations', 'Alumni, unions, clubs and cooperatives'],
+                ['Educational institutions', 'Select leaders and representatives'],
+                ['Religious organizations', 'Elect councils and committees'],
+                ['Nonprofits and NGOs', 'Board elections and member votes'],
+                ['Clubs and associations', 'Membership votes and officer elections'],
               ].map(([who, what]) => (
                 <div key={who} className="border-t-2 border-ink pt-3">
                   <dt className="font-bold">{who}</dt>
