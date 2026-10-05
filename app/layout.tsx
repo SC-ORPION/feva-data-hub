@@ -8,7 +8,7 @@ const mono = Atkinson_Hyperlegible_Mono({ subsets: ['latin'], variable: '--font-
 
 export const metadata: Metadata = {
   title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
-  description: 'Run a fair, secret vote for your school, church or group. Voters use their phone. Results count themselves.',
+  description: 'Run a fair, secret vote for your organization. Voters use their phone. Results count themselves.',
 };
 
 export const viewport: Viewport = {

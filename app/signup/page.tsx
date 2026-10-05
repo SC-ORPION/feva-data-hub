@@ -76,11 +76,11 @@ export default function SignupPage() {
     >
       <form onSubmit={submit} className="grid gap-5" noValidate>
         <Field
-          label=”Organization name”
-          htmlFor=”org”
-          hint=”Voters will see this name when they vote.”
+          label="Organization name"
+          htmlFor="org"
+          hint="Voters will see this name when they vote."
         >
-          <Input id=”org” value={org} onChange={(e) => setOrg(e.target.value)} required maxLength={120} autoComplete=”organization” />
+          <Input id="org" value={org} onChange={(e) => setOrg(e.target.value)} required maxLength={120} autoComplete="organization" />
         </Field>
         <Field label="Your name" htmlFor="name">
           <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" />

@@ -12,7 +12,7 @@ export default function NotFound() {
         <h1 className="mt-2 text-2xl font-bold">We couldn’t find that page</h1>
         <p className="mt-2 text-ink-2">
           If someone sent you a voting link, check that you typed it exactly. Voting links look like
-          <span className="font-mono text-ink"> /v/your-school/src-elections</span>.
+          <span className="font-mono text-ink"> /v/your-group/elections-2026</span>.
         </p>
         <ButtonLink href="/" variant="secondary" className="mt-6">
           Go to the home page

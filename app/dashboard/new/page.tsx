@@ -89,7 +89,6 @@ export default function NewElectionPage() {
 
   function chooseTemplate(t: Template) {
     setTemplate(t);
-    setMajority(t === 'school');
     const untouched = positions.every((p) => p.candidates.every((c) => !c.name.trim()));
     if (untouched) setPositions(TEMPLATES[t].positions.map(([name, seats]) => newPosition(name, seats)));
   }
@@ -105,7 +104,7 @@ export default function NewElectionPage() {
 
   function problem(at: number): string | null {
     if (at === 0) {
-      if (title.trim().length < 3) return 'Give this election a name, like “SRC Elections 2026”.';
+      if (title.trim().length < 3) return 'Give this election a name, like “Leadership Elections 2026”.';
     }
     if (at === 1 && !method) return 'Choose how voters will sign in.';
     if (at === 2 && !addLater) {
@@ -265,7 +264,7 @@ export default function NewElectionPage() {
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder={pickedTemplate?.example ?? 'SRC Elections 2026'}
+                  placeholder={pickedTemplate?.example ?? 'Election 2026'}
                   maxLength={140}
                 />
               </Field>
@@ -275,7 +274,7 @@ export default function NewElectionPage() {
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Voting is open to all registered students. Results will be announced at the SRC office."
+                  placeholder="Voting is open to all registered members. Results will be announced after voting closes."
                   maxLength={2000}
                 />
               </Field>

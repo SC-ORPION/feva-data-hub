@@ -15,3 +15,5 @@ export function orgVotingHome(orgSlug: string, origin: string): string {
 export function electionVotingUrl(orgSlug: string, electionSlug: string, origin: string): string {
   return `${orgVotingHome(orgSlug, origin)}/${electionSlug}`;
 }
+
+export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || '';

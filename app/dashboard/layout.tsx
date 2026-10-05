@@ -22,7 +22,7 @@ function OrgSetup() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (name.trim().length < 2) return setError('Enter the name of your school, church or group.');
+    if (name.trim().length < 2) return setError('Enter the name of your organization.');
     setBusy(true);
     const { error: rpcError } = await supabaseBrowser().rpc('create_organization', { p_name: name.trim() });
     if (rpcError) {
@@ -33,7 +33,7 @@ function OrgSetup() {
   }
 
   return (
-    <AuthShell title="One more step" intro="What is the name of the school, church or group running elections?">
+    <AuthShell title="One more step" intro="What is the name of the organization running elections?">
       <form onSubmit={submit} className="grid gap-5">
         <Field label="Organization name" htmlFor="org" hint="Voters will see this name.">
           <Input id="org" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />

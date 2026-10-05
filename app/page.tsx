@@ -2,7 +2,7 @@ import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { ButtonLink } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
 import { Initials, ThumbBox } from '@/components/voting/thumb-box';
-import { APP_NAME } from '@/lib/config';
+import { SiteFooter } from '@/components/site-shell';
 
 function BallotPreview() {
   return (
@@ -71,12 +71,12 @@ const STEPS = [
 ];
 
 const PROMISES = [
-  [‘Secret ballot’, ‘Nobody can see who voted for whom. Not the organizers and not us.’],
-  [‘One person, one vote’, ‘Once someone votes, their email, number or code is used up.’],
-  [‘A receipt nobody can buy’, ‘Voters can check their ballot was counted, but can’t prove to anyone how they voted.’],
-  [‘50% + 1 and run-offs’, ‘If nobody passes half the votes, start a run-off between the top two, with the same voters.’],
-  [‘Works without smartphones’, ‘Print code slips, and let people vote on a shared computer.’],
-  [‘You own your list’, ‘Delete everyone’s details when the vote is over. The results stay.’],
+  ['Secret ballot', 'Nobody can see who voted for whom. Not the organizers and not us.'],
+  ['One person, one vote', 'Once someone votes, their email, number or code is used up.'],
+  ['A receipt nobody can buy', 'Voters can check their ballot was counted, but can’t prove to anyone how they voted.'],
+  ['50% + 1 and run-offs', 'If nobody passes half the votes, start a run-off between the top two, with the same voters.'],
+  ['Works without smartphones', 'Print code slips, and let people vote on a shared computer.'],
+  ['You own your list', 'Delete everyone’s details when the vote is over. The results stay.'],
 ];
 
 function CountCheckPreview() {
@@ -123,6 +123,9 @@ export default function Home() {
       <header className="mx-auto flex max-w-6xl items-center justify-between gap-4 py-5">
         <Logo />
         <nav className="flex items-center gap-1 sm:gap-2">
+          <ButtonLink href="/pricing" variant="ghost" className="hidden sm:inline-flex">
+            Pricing
+          </ButtonLink>
           <ButtonLink href="/login" variant="ghost">
             Sign in
           </ButtonLink>
@@ -219,12 +222,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="mx-auto flex max-w-6xl flex-wrap justify-between gap-2 border-t border-line py-6 text-sm text-ink-3">
-        <span>
-          © {new Date().getFullYear()} {APP_NAME}
-        </span>
-        <span>Made for elections in Ghana</span>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
